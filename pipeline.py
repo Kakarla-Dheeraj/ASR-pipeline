@@ -11,7 +11,7 @@ from saaras_transcriber import SaarasTranscriber
 
 load_dotenv()
 
-AUDIO_FILE = "tamil.mp3"
+AUDIO_FILE = "/audio_files/tamil.mp3"
 
 preprocessor = AudioPreprocessor()
 vad = VADProcessor()
