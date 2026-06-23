@@ -9,8 +9,8 @@ This project implements a multilingual Automatic Speech Recognition (ASR) and sp
 - **Speaker Diarization**: Identifies different speakers and their speech boundaries using PyAnnote.
 - **Smart Turn Merging**: Groups consecutive segments from the same speaker to optimize API efficiency.
 - **ASR Routing**: 
-  - **Groq Whisper** for English transcription.
-  - **Sarvam Saaras** for Indian regional languages (Hindi, Marathi, Tamil, Telugu, etc.).
+- **Groq Whisper** for English transcription.
+- **Sarvam Saaras** for Indian regional languages (Hindi, Marathi, Tamil, Telugu, etc.).
 - **FastAPI Wrapper**: Exposes the pipeline via a web service.
 
 ---
@@ -40,18 +40,21 @@ This project implements a multilingual Automatic Speech Recognition (ASR) and sp
    [Audio Segmenter] (Merge consecutive turns & split chunks)
           │
           ▼
-   [ASR Router] ───────────────┬────────────────
-                               │
-                       (Indian Language?)
-                               ▼
-                        [Sarvam Saaras]
-                               or
-                           (English?)
-                               ▼
-                         [Groq Whisper]
+   [ASR Router] 
           │
           ▼
-   [Formatted Dialogues / Clean Transcript Output]
+ (Indian Language?)
+          │
+          ▼
+  [Sarvam Saaras]
+          or
+      (English?)
+          │
+          ▼
+    [Groq Whisper]
+          │
+          ▼
+[Formatted Dialogues / Clean Transcript Output]
 ```
 
 ---
