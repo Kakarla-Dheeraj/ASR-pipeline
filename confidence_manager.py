@@ -2,7 +2,7 @@ class ConfidenceManager:
 
     def __init__(
         self,
-        high_confidence_threshold=0.80
+        high_confidence_threshold=0.70
     ):
 
         self.high_confidence_threshold = (

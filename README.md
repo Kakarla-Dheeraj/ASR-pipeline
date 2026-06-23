@@ -1,124 +1,169 @@
-ASR Pipeline
-Overview
+# Multilingual ASR & Diarization Pipeline
 
-This project implements a multilingual Automatic Speech Recognition (ASR) pipeline with:
+This project implements a multilingual Automatic Speech Recognition (ASR) and speaker diarization pipeline. It automatically detects the spoken language, splits the audio by speaker turns, and routes transcription requests to the best-suited provider.
 
-Voice Activity Detection (VAD)
-Language Identification using SpeechBrain
-Confidence-based language detection retries
-Routing to different ASR providers
-Groq Whisper for English transcription
-Sarvam Saaras for Indian language transcription
-Supported Flow
+## Features
 
-Audio File
-↓
-Preprocessing
-↓
-Voice Activity Detection
-↓
-Speech Accumulation
-↓
-Language Detection
-↓
-Provider Selection
-↓
-Transcription
+- **Voice Activity Detection (VAD)**: Extracts active speech regions using Silero VAD.
+- **Language Detection (LID)**: Identifies the language using SpeechBrain, with confidence-based retry logic.
+- **Speaker Diarization**: Identifies different speakers and their speech boundaries using PyAnnote.
+- **Smart Turn Merging**: Groups consecutive segments from the same speaker to optimize API efficiency.
+- **ASR Routing**: 
+  - **Groq Whisper** for English transcription.
+  - **Sarvam Saaras** for Indian regional languages (Hindi, Marathi, Tamil, Telugu, etc.).
+- **FastAPI Wrapper**: Exposes the pipeline via a web service.
 
-Project Structure
-.
-├── pipeline.py
-├── preprocess.py
-├── vad.py
-├── speech_accumulator.py
-├── language_detector.py
-├── confidence_manager.py
-├── router.py
-├── whisper_transcriber.py
-├── saaras_transcriber.py
-├── requirements.txt
-└── .env
-Python Version
+---
 
-Recommended:
+## Pipeline Flow
 
-Python 3.11+
-Create Virtual Environment
+```text
+  [Audio File Input]
+          │
+          ▼
+   [Preprocessing] (Normalized mono audio at 16kHz)
+          │
+          ▼
+   [VAD Processor] (Extract speech regions)
+          │
+          ▼
+   [Speech Accumulator] (Collect sliding window of speech)
+          │
+          ▼
+   [Language Identifier] ─── (Confidence < 0.70?) ───► [Increase Window & Retry]
+          │
+      (Accept)
+          ▼
+   [Speaker Diarizer] (PyAnnote turn boundary detection)
+          │
+          ▼
+   [Audio Segmenter] (Merge consecutive turns & split chunks)
+          │
+          ▼
+   [ASR Router] ───────────────┬────────────────
+                               │
+                       (Indian Language?)
+                               ▼
+                        [Sarvam Saaras]
+                               or
+                           (English?)
+                               ▼
+                         [Groq Whisper]
+          │
+          ▼
+   [Formatted Dialogues / Clean Transcript Output]
+```
+
+---
+
+## Getting Started
+
+### 1. Install Dependencies
+Make sure you have **Python 3.14** installed, then run:
+
+```bash
+# Create and activate virtual environment
 python -m venv .venv
-
 source .venv/bin/activate
-Install Dependencies
-pip install torch torchaudio
 
-pip install speechbrain
+# Install requirements
+pip install torch torchaudio silero-vad speechbrain librosa numpy python-dotenv groq sarvamai fastapi uvicorn python-multipart soundfile
+```
 
-pip install silero-vad
+### 2. Configure Environment Variables
+Create a `.env` file in the root directory:
 
-pip install librosa
-
-pip install numpy
-
-pip install python-dotenv
-
-pip install groq
-
-pip install sarvamai
-Environment Variables
-
-Create a .env file:
-
+```env
 GROQ_API_KEY=your_groq_api_key
-
 SARVAM_API_KEY=your_sarvam_api_key
+HF_TOKEN=your_huggingface_token  # Required for PyAnnote diarization models
+```
 
-HF_TOKEN=your_huggingface_token
-Running
+---
 
-Update the audio path in:
+## Usage
 
-AUDIO_FILE = "sample.mp3"
-
-Then run:
-
+### Run as a Script
+To test the pipeline locally on a sample audio file:
+1. Update `AUDIO_FILE` inside the `__main__` block in `pipeline.py`.
+2. Run:
+```bash
 python pipeline.py
-Example Output
-Window: 30s
-{
-    "language": "hi",
-    "confidence": 0.99
-}
+```
 
-Selected Provider:
-saaras
+### Run as a FastAPI Service
+Start the API server locally:
+```bash
+uvicorn app:app --port 8000 --reload
+```
 
-Transcript:
-...
-Current Providers
-English
+### Run with Docker
+You can also run the application inside a container to avoid setting up dependencies locally:
 
-Provider:
+1. **Build the Docker image**:
+   ```bash
+   docker build -t asr-pipeline .
+   ```
 
-Groq Whisper
-Indian Languages
+2. **Run the container**:
+   Pass your local `.env` variables to the container to authenticate with the API providers:
+   ```bash
+   docker run -p 8000:8000 --env-file .env asr-pipeline
+   ```
 
-Provider:
 
-Sarvam Saaras
+---
 
-Supported language routing:
+## API Documentation
 
-Hindi
-Bengali
-Tamil
-Telugu
-Marathi
-Gujarati
-Kannada
-Malayalam
-Assamese
-Urdu
-Sanskrit
-Nepali
-Punjabi
-Odia
-Sindhi
+### 1. Health Check
+- **Endpoint**: `GET /health`
+- **Response**:
+  ```json
+  {"status": "healthy"}
+  ```
+
+### 2. Transcribe Audio
+- **Endpoint**: `POST /transcribe`
+- **Request Type**: `multipart/form-data`
+- **Parameters**:
+  - `file` (Required): The audio file (supported formats: `.wav`, `.mp3`, `.flac`, `.ogg`, `.m4a`).
+  - `speaker_names` (Optional): A JSON string mapping default speaker IDs to custom names.
+    - Example: `{"SPEAKER_00": "Agent", "SPEAKER_01": "Customer"}`
+
+- **Example request with curl**:
+  ```bash
+  curl -X POST \
+    -F "file=@audio.wav" \
+    -F 'speaker_names={"SPEAKER_00": "Alice", "SPEAKER_01": "Bob"}' \
+    http://127.0.0.1:8000/transcribe
+  ```
+
+- **Response Format**:
+  ```json
+  {
+    "analysis": {
+      "language": "hi",
+      "confidence": 0.8357,
+      "provider": "saaras",
+      "speech_duration": 19.87,
+      "speakers_count": 2
+    },
+    "dialogue": [
+      {
+        "speaker": "SPEAKER_01",
+        "start": 0.76,
+        "end": 1.65,
+        "text": "और क्या चल रहा है?"
+      },
+      {
+        "speaker": "SPEAKER_00",
+        "start": 2.21,
+        "end": 3.56,
+        "text": "काही नाही, काय सुरू आहे?"
+      }
+    ],
+    "transcript": "Bob: और क्या चल रहा है?\nAlice: काही नाही, काय सुरू आहे?",
+    "clean_transcript": "और क्या चल रहा है?\nकाही नाही, काय सुरू आहे?"
+  }
+  ```

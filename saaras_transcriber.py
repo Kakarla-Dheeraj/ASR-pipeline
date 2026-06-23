@@ -88,13 +88,19 @@ class SaarasTranscriber:
             f"{os.path.basename(audio_path)}.json"
         )
 
-        with open(
-            json_file,
-            "r",
-            encoding="utf-8"
-        ) as f:
+        try:
+            with open(
+                json_file,
+                "r",
+                encoding="utf-8"
+            ) as f:
+                data = json.load(f)
+            transcript = data["transcript"]
+        finally:
+            if os.path.exists(json_file):
+                try:
+                    os.remove(json_file)
+                except Exception as e:
+                    print(f"Failed to delete {json_file}: {e}")
 
-            data = json.load(f)
-
-
-        return data["transcript"]
+        return transcript

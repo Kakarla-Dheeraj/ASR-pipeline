@@ -1,0 +1,11 @@
+.venv
+.git
+.gitignore
+__pycache__
+temp_*.wav
+temp_upload_*
+output/temp_*
+.env
+Dockerfile
+.dockerignore
+*.log
